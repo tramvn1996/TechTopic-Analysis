@@ -1,0 +1,24 @@
+---
+title: "cinf401-assignment-2"
+author: "Tram Nguyen"
+date: "1/31/2018"
+output: html_document
+---
+```{r}
+p <- read.csv(file="/bigdata/data/aaai/click-classes.csv", header=FALSE, sep=",")
+colnames(p) <- c("ts","URL","keywords","classes")
+
+# separate out ","
+classes <- strsplit(as.character(p$classes), split=";")
+p2 <- data.frame(ts=rep(p$ts, sapply(classes, length)),
+                     Technology=unlist(classes))
+
+#separate out "\\"
+classes2 <- strsplit(as.character(p2$Technology), split="\\|")
+p3 <- data.frame(ts=rep(p2$ts, sapply(classes2, length)),
+                    Technology=unlist(classes2))
+
+aggp1<- aggregate(ts ~ Technology, p3, length)
+o <- aggp1[order(-aggp1$ts),] 
+```
+
