@@ -15,59 +15,160 @@ colnames(p) <- c("ts","URL","keywords","classes")
 classes <- strsplit(as.character(p$classes), split=";")
 p2 <- data.frame(ts=rep(p$ts, sapply(classes, length)),
                      Technology=unlist(classes))
+p2$name <- p2$Technology
+p2$name <- substr(p2$name,0,3)
+
+#data frame of Industry
+p2_industry <- p2[p2$name=="Ind",]
+classes2 <- strsplit(as.character(p2_industry$Technology), split="\\|")
+p3_industry <- data.frame(ts=rep(p2_industry$ts, sapply(classes2, length)),
+                    Technology=unlist(classes2))
+p3_industry$Technology <- factor(p3_industry$Technology, levels=sort(unique(p3_industry$Technology), decreasing=TRUE))
+p3_industry <- p3_industry[p3_industry$Technology != "Information Technology",]
+p3_industry <- p3_industry[p3_industry$Technology != "Artificial Intelligence",]
+p3_industry <- p3_industry[p3_industry$Technology != "Technology",]
+p3_industry <- p3_industry[p3_industry$Technology != "Industry",]
+
+library(anytime)
+p3_industry$Date <- anydate(p3_industry$ts)
+p3_industry <- p3_industry[order(p3_industry$ts),]
+p3_industry$week <- as.numeric(p3_industry$Date-p3_industry$Date[1]) %/% 7
+
+p3_industry <- p3_industry[p3_industry$week != 27,]
+p3_industry <- p3_industry[p3_industry$week != 29,]
+
+click_per_week_industry <- aggregate(ts ~ week , p3_industry, length)
+colnames(click_per_week_industry) <- c("week","click_per_week")
+
+p3_industry <- merge(p3_industry, click_per_week_industry, "week")
+
+ts_tech_industry <- aggregate(ts ~ week + Technology + click_per_week, p3_industry, length)
+colnames(ts_tech_industry) <- c("week", "Technology","click_per_week", "Count")
+ts_tech_industry$Percent <- ts_tech_industry$Count / ts_tech_industry$click_per_week
+
+p_top_tech_industry <- aggregate(ts ~ Technology, p3_industry, length)
+colnames(p_top_tech_industry) <- c("Technology", "Count")
+
+#top count for each Tech in general
+p_top_tech_industry <- p_top_tech_industry[order(-p_top_tech_industry$Count),]
+
+#calculating the most common average 
+p_avg_tech_industry <- aggregate(Percent ~ Technology, ts_tech_industry, mean)
+p_avg_tech_industry <- p_avg_tech_industry[order(-p_avg_tech_industry$Percent),]
+p_avg_tech_industry <- p_avg_tech_industry[1:6,]
 
 #separate out "\\"
-classes2 <- strsplit(as.character(p2$Technology), split="\\|")
-p3 <- data.frame(ts=rep(p2$ts, sapply(classes2, length)),
+classes2 <- strsplit(as.character(p2_industry$Technology), split="\\|")
+p3_industry <- data.frame(ts=rep(p2_industry$ts, sapply(classes2, length)),
                     Technology=unlist(classes2))
-p3$Technology <- factor(p3$Technology, levels=sort(unique(p3$Technology), decreasing=TRUE))
+p3_industry$Technology <- factor(p3_industry$Technology, levels=sort(unique(p3_industry$Technology), decreasing=TRUE))
 
 #Omitted common terms like "Industry", "Technology", "Information Technology", "AI"
-p3 <- p3[p3$Technology != "Information Technology",]
-p3 <- p3[p3$Technology != "Artificial Intelligence",]
-p3 <- p3[p3$Technology != "Technology",]
-p3 <- p3[p3$Technology != "Industry",]
+p3_industry <- p3_industry[p3_industry$Technology != "Information Technology",]
+p3_industry <- p3_industry[p3_industry$Technology != "Artificial Intelligence",]
+p3_industry <- p3_industry[p3_industry$Technology != "Technology",]
+p3_industry <- p3_industry[p3_industry$Technology != "Industry",]
 
-# Format data into weeks
-install.packages("anytime")
-library(anytime)
-p3$Date <- anydate(p3$ts)
-p3$week <- as.numeric(p3$Date-p3$Date[1]) %/% 7
+#omitted the last 2 weeks since there's an error with the server
+#p3 <- p3[p3$week != 27,]
+#p3 <- p3[p3$week != 29,]
+
+
 ```
 
-click per ts
+Graph of Industry count
 ```{r}
-click_per_ts <- aggregate(Technology ~ ts, p3, length)
-colnames(click_per_ts) <- c("ts", "Click_per_ts")
+library(ggplot2)
+p_common_clicked_avg_industry <-
+  ggplot(ts_tech_industry[ts_tech_industry$Technology %in% c("Deep Learning", as.character(p_avg_tech_industry$Technology)),]) +
+  geom_smooth(aes(x=week, y=Count, color=Technology), se=FALSE) +
+  scale_x_continuous("Week",breaks=seq(0,26,2)) +
+  scale_y_continuous("times clicked") +
+  labs(color="") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank())
+ggsave("tram-common-industry.png",p_common_clicked_avg_industry , width=6, height=6, dpi=600)
+print(p_common_clicked_avg_industry)
 ```
 
-join to the big table (p3)
+
+Technology
+
 ```{r}
-p3 <- merge(p3, click_per_ts, "ts")
-p3$ts2 <- p3$ts
+p2_tech <- p2[p2$name=="Tec",]
+classes3 <- strsplit(as.character(p2_tech$Technology), split="\\|")
+p3_tech <- data.frame(ts=rep(p2_tech$ts, sapply(classes3, length)),
+                    Technology=unlist(classes3))
+p3_tech$Technology <- factor(p3_tech$Technology, levels=sort(unique(p3_tech$Technology), decreasing=TRUE))
+p3_tech <- p3_tech[p3_tech$Technology != "Information Technology",]
+p3_tech <- p3_tech[p3_tech$Technology != "Artificial Intelligence",]
+p3_tech <- p3_tech[p3_tech$Technology != "Technology",]
+p3_tech <- p3_tech[p3_tech$Technology != "Industry",]
 
-ts_tech <- aggregate(ts2 ~ ts + Technology + Click_per_ts, p3, length)
-colnames(ts_tech) <- c("ts", "Technology", "Click_per_ts", "Count")
-ts_tech$Percent <- ts_tech$Count / ts_tech$Click_per_ts
+p3_tech$Date <- anydate(p3_tech$ts)
+p3_tech <- p3_tech[order(p3_tech$ts),]
+p3_tech$week <- as.numeric(p3_tech$Date-p3_tech$Date[1]) %/% 7
 
-p_top_tech <- aggregate(ts ~ Technology, p3, length)
+p3_tech <- p3_tech[p3_tech$week != 27,]
+p3_tech <- p3_tech[p3_tech$week != 29,]
+
+click_per_week_tech <- aggregate(ts ~ week , p3_tech, length)
+colnames(click_per_week_tech) <- c("week","click_per_week")
+
+p3_tech <- merge(p3_tech, click_per_week_tech, "week")
+
+ts_tech <- aggregate(ts ~ week + Technology + click_per_week, p3_tech, length)
+colnames(ts_tech) <- c("week", "Technology","click_per_week", "Count")
+ts_tech$Percent <- ts_tech$Count / ts_tech$click_per_week
+
+p_top_tech <- aggregate(ts ~ Technology, p3_tech, length)
 colnames(p_top_tech) <- c("Technology", "Count")
 
 #top count for each Tech in general
 p_top_tech <- p_top_tech[order(-p_top_tech$Count),]
 
-#calculating the most dramatic %change
-p_max_tech <- aggregate(Percent ~ Technology, ts_tech, max)
-p_min_tech <- aggregate(Percent ~ Technology, ts_tech, min)
-p_top_tech$MaxMin <- sapply(p_top_tech$Technology, function(tech) {
-  p_max_tech[p_max_tech$Technology == tech,"Percent"] - p_min_tech[p_min_tech$Technology == tech,"Percent"] })
-p_dramatic_tech <- p_top_tech[order(-p_top_tech$MaxMin),][1:6,]
+#calculating the most common average 
+p_avg_tech <- aggregate(Percent ~ Technology, ts_tech, mean)
+p_avg_tech <- p_avg_tech[order(-p_avg_tech$Percent),]
+p_avg_tech <- p_avg_tech[1:6,]
+```
+
+Graph of Technology count
+```{r}
+p_common_clicked_avg_tech <-
+  ggplot(ts_tech[ts_tech$Technology %in% c("Deep Learning", as.character(p_avg_tech$Technology)),]) +
+  geom_smooth(aes(x=week, y=Count, color=Technology), se=FALSE) +
+  scale_x_continuous("Week",breaks=seq(0,26,2)) +
+  scale_y_continuous("times clicked") +
+  labs(color="") +
+  theme_bw() +
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.ticks.y = element_blank())
+ggsave("tram-common-tech.png",p_common_clicked_avg_tech , width=6, height=6, dpi=600)
+print(p_common_clicked_avg_tech)
 ```
 
 
-# aggregate (count)
-aggp1<- aggregate(ts ~ Technology + ts, p3, length)
-o <- aggp1[order(-aggp1$ts),] 
+2. a bar chart of the top classes overall, x-axis: class, y-axis: percent of overall clicks.
+
+```{r}
+#basic bar plot of Industry 
+library(stringr)
+bar_industry <- 
+  ggplot(ts_tech_industry[ts_tech_industry$Technology %in% c("Deep Learning",as.character(p_avg_tech_industry$Technology)),],aes(x=Technology, y=Percent)) +
+  geom_bar(stat="identity")+
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 10)) + 
+  scale_y_continuous("Percent clicked") + 
+  labs(color="blue") +
+  theme_bw()
+print(bar_industry)
 ```
 
 
