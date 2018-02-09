@@ -4,6 +4,9 @@ author: "Tram Nguyen"
 date: "1/31/2018"
 output: html_document
 ---
+
+1. a line plot of the most commonly clicked classes over time (in either Industry or Technology taxonomy), x-axis: time (weeks), y-axis: number of clicks per class, use color for the class.
+? either Industry or Technology? Do we need to separate these 2 terms?
 ```{r}
 p <- read.csv(file="/bigdata/data/aaai/click-classes.csv", header=FALSE, sep=",")
 colnames(p) <- c("ts","URL","keywords","classes")
@@ -17,8 +20,54 @@ p2 <- data.frame(ts=rep(p$ts, sapply(classes, length)),
 classes2 <- strsplit(as.character(p2$Technology), split="\\|")
 p3 <- data.frame(ts=rep(p2$ts, sapply(classes2, length)),
                     Technology=unlist(classes2))
+p3$Technology <- factor(p3$Technology, levels=sort(unique(p3$Technology), decreasing=TRUE))
 
-aggp1<- aggregate(ts ~ Technology, p3, length)
+#Omitted common terms like "Industry", "Technology", "Information Technology", "AI"
+p3 <- p3[p3$Technology != "Information Technology",]
+p3 <- p3[p3$Technology != "Artificial Intelligence",]
+p3 <- p3[p3$Technology != "Technology",]
+p3 <- p3[p3$Technology != "Industry",]
+
+# Format data into weeks
+install.packages("anytime")
+library(anytime)
+p3$Date <- anydate(p3$ts)
+p3$week <- as.numeric(p3$Date-p3$Date[1]) %/% 7
+```
+
+click per ts
+```{r}
+click_per_ts <- aggregate(Technology ~ ts, p3, length)
+colnames(click_per_ts) <- c("ts", "Click_per_ts")
+```
+
+join to the big table (p3)
+```{r}
+p3 <- merge(p3, click_per_ts, "ts")
+p3$ts2 <- p3$ts
+
+ts_tech <- aggregate(ts2 ~ ts + Technology + Click_per_ts, p3, length)
+colnames(ts_tech) <- c("ts", "Technology", "Click_per_ts", "Count")
+ts_tech$Percent <- ts_tech$Count / ts_tech$Click_per_ts
+
+p_top_tech <- aggregate(ts ~ Technology, p3, length)
+colnames(p_top_tech) <- c("Technology", "Count")
+
+#top count for each Tech in general
+p_top_tech <- p_top_tech[order(-p_top_tech$Count),]
+
+#calculating the most dramatic %change
+p_max_tech <- aggregate(Percent ~ Technology, ts_tech, max)
+p_min_tech <- aggregate(Percent ~ Technology, ts_tech, min)
+p_top_tech$MaxMin <- sapply(p_top_tech$Technology, function(tech) {
+  p_max_tech[p_max_tech$Technology == tech,"Percent"] - p_min_tech[p_min_tech$Technology == tech,"Percent"] })
+p_dramatic_tech <- p_top_tech[order(-p_top_tech$MaxMin),][1:6,]
+```
+
+
+# aggregate (count)
+aggp1<- aggregate(ts ~ Technology + ts, p3, length)
 o <- aggp1[order(-aggp1$ts),] 
 ```
+
 
